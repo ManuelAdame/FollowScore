@@ -26,6 +26,11 @@ Desde el panel puedes crear un partido nuevo. Cada partido tendrá sus propias
 URLs, por ejemplo `/control/abc123` y `/overlay/abc123`. En OBS se utiliza la
 URL del overlay como **Fuente de navegador** con fondo transparente.
 
+El panel requiere iniciar sesión. Para desarrollo local se puede usar
+`admin` / `admin123`. En cualquier entorno compartido cambia estas credenciales
+con las variables `ADMIN_USER` y `ADMIN_PASSWORD` antes de iniciar el servidor.
+El overlay de OBS no requiere autenticación.
+
 ## Flujo inicial
 
 1. El servidor mantiene los estados de las salas en memoria.
@@ -35,8 +40,7 @@ URL del overlay como **Fuente de navegador** con fondo transparente.
 
 ## Próximos pasos
 
-1. Añadir autenticación sencilla para proteger el panel de control.
-2. Modelar deportes concretos (sets, periodos, saques y faltas).
-3. Persistir partidos y estadísticas en PostgreSQL.
-4. Añadir configuración visual del overlay y una URL pública para OBS.
-5. Probar reconexión, latencia y despliegue.
+1. Modelar deportes concretos (sets, periodos, saques y faltas).
+2. Persistir partidos y estadísticas en PostgreSQL.
+3. Añadir configuración visual del overlay y una URL pública para OBS.
+4. Probar reconexión, latencia y despliegue.

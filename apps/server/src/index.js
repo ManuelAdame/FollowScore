@@ -1,5 +1,6 @@
 import express from "express";
 import http from "node:http";
+import crypto from "node:crypto";
 import { WebSocketServer } from "ws";
 import {
   actionTypes,
@@ -15,6 +16,9 @@ const webSocketServer = new WebSocketServer({ server, path: "/ws" });
 
 const matches = new Map([["demo", structuredClone(initialMatchState)]]);
 const clientsByMatch = new Map();
+const sessions = new Set();
+const adminUser = process.env.ADMIN_USER ?? "admin";
+const adminPassword = process.env.ADMIN_PASSWORD ?? "admin123";
 
 app.get("/health", (_request, response) => {
   response.json({ status: "ok", service: "marcador-server" });
@@ -23,11 +27,35 @@ app.get("/health", (_request, response) => {
 app.use(express.json());
 app.use((_request, response, next) => {
   response.header("Access-Control-Allow-Origin", "*");
-  response.header("Access-Control-Allow-Headers", "Content-Type");
+  response.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  response.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   next();
 });
 
-app.post("/matches", (_request, response) => {
+app.options("*", (_request, response) => response.sendStatus(204));
+
+function isAuthenticated(request) {
+  const token = request.headers.authorization?.replace("Bearer ", "");
+  return Boolean(token && sessions.has(token));
+}
+
+app.post("/auth/login", (request, response) => {
+  const { username, password } = request.body ?? {};
+  if (username !== adminUser || password !== adminPassword) {
+    response.status(401).json({ message: "Usuario o contraseña incorrectos." });
+    return;
+  }
+
+  const token = crypto.randomBytes(32).toString("hex");
+  sessions.add(token);
+  response.json({ token });
+});
+
+app.post("/matches", (request, response) => {
+  if (!isAuthenticated(request)) {
+    response.status(401).json({ message: "Necesitas iniciar sesión." });
+    return;
+  }
   const matchId = `${Date.now().toString(36)}-${Math.random()
     .toString(36)
     .slice(2, 7)}`;
@@ -50,7 +78,8 @@ function broadcast(matchId, message) {
   }
 }
 
-function handleAction(matchId, action) {
+function handleAction(matchId, action, canEdit) {
+  if (!canEdit) return;
   if (!isScoreAction(action)) return;
 
   const matchState = getMatch(matchId);
@@ -95,9 +124,9 @@ function handleAction(matchId, action) {
 }
 
 webSocketServer.on("connection", (socket, request) => {
-  const matchId =
-    new URL(request.url, "http://localhost").searchParams.get("matchId") ||
-    "demo";
+  const query = new URL(request.url, "http://localhost").searchParams;
+  const matchId = query.get("matchId") || "demo";
+  const canEdit = sessions.has(query.get("token"));
   const clients = clientsByMatch.get(matchId) ?? new Set();
   clients.add(socket);
   clientsByMatch.set(matchId, clients);
@@ -105,7 +134,7 @@ webSocketServer.on("connection", (socket, request) => {
 
   socket.on("message", (rawMessage) => {
     try {
-    handleAction(matchId, JSON.parse(rawMessage.toString()));
+    handleAction(matchId, JSON.parse(rawMessage.toString()), canEdit);
     } catch {
       socket.send(
         JSON.stringify({
