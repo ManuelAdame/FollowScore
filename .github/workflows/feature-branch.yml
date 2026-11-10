@@ -1,0 +1,91 @@
+# ----------------------------------------------------------------------------
+# Feature Branch Workflow con validación de commits y merge automático
+# ----------------------------------------------------------------------------
+
+name: Feature Branch Workflow
+
+on:
+  push:
+    branches:
+      - 'feat/*'
+      - 'fix/*'
+      - 'test/*'
+      - 'docs/*'
+
+jobs:
+  validate-commits:
+    name: Validate Commits
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate commit messages
+        run: |
+          echo "Branch target: ${{ github.ref_name }}"
+
+          git fetch origin develop
+          
+          commits=$(git log origin/develop..HEAD --format="%s")
+
+          if [ -z "$commits" ]; then
+            echo "No new commits to validate."
+            exit 0
+          fi
+
+          echo "Commits to validate:"
+          echo "$commits"
+
+          while IFS= read -r mensaje; do
+            [ -z "$mensaje" ] && continue
+            if ! echo "$mensaje" | grep -Eq '^(feat|fix|test|docs)(\([a-zA-Z0-9._-]+\))?: .+$'; then
+              echo "Error: Invalid commit message -> '$mensaje'"
+              exit 1
+            fi
+          done <<< "$commits"
+
+          echo "All commit messages are valid."
+
+  merge-to-develop:
+    name: Merge to Develop
+    needs: validate-commits
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "AutoMerge Bot"
+          git config user.email "bot@repo.local"
+
+      - name: Merge branch to develop
+        run: |
+          BRANCH_NAME="${{ github.ref_name }}"
+          echo "Merging $BRANCH_NAME → develop"
+
+          git fetch origin
+          git checkout develop
+          git merge --no-ff "origin/$BRANCH_NAME" -m "Merge branch '$BRANCH_NAME' created by @$AUTHOR into develop"
+          git push origin develop
+          echo "Merge completed."
+
+  cleanup:
+    name: Delete Temporary Branch
+    needs: merge-to-develop
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete remote branch
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          BRANCH_NAME="${{ github.ref_name }}"
+          echo "Deleting remote branch: $BRANCH_NAME"
+          
+          gh api --method DELETE "repos/${{ github.repository }}/git/refs/heads/$BRANCH_NAME" || true
+          echo "Branch deleted successfully."
