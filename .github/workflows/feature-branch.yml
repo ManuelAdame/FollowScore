@@ -59,19 +59,29 @@ jobs:
           token: ${{ secrets.PAT_TOKEN }}
           fetch-depth: 0
 
-      - name: Configure Git
+      - name: Configure Git Author
         run: |
-          git config user.name "AutoMerge Bot"
-          git config user.email "bot@repo.local"
+          # Extraer el usuario que hizo el push
+          ACTOR="${{ github.triggering_actor || github.actor }}"
+          echo "Triggered by: $ACTOR"
+
+          # Configurar Git localmente para este paso con la identidad de quien lanzó el workflow
+          git config user.name "$ACTOR"
+          git config user.email "$ACTOR@users.noreply.github.com"
 
       - name: Merge branch to develop
         run: |
           BRANCH_NAME="${{ github.ref_name }}"
-          echo "Merging $BRANCH_NAME → develop"
+          ACTOR="${{ github.triggering_actor || github.actor }}"
+          
+          echo "Merging $BRANCH_NAME (by @$ACTOR) → develop"
 
           git fetch origin
           git checkout develop
-          git merge --no-ff "origin/$BRANCH_NAME" -m "Merge branch '$BRANCH_NAME' created by @$AUTHOR into develop"
+          
+          # Realizar el merge usando el nombre extraído
+          git merge --no-ff "origin/$BRANCH_NAME" -m "Merge branch '$BRANCH_NAME' created by @$ACTOR into develop"
+          
           git push origin develop
           echo "Merge completed."
 
