@@ -7,6 +7,11 @@ const serverUrl = `http://${window.location.hostname}:3001`;
 const socketUrl = `ws://${window.location.hostname}:3001/ws`;
 const pathParts = window.location.pathname.split("/").filter(Boolean);
 const matchId = pathParts[1] || "demo";
+const isOverlay = window.location.pathname.startsWith("/overlay");
+
+function getToken() {
+  return window.localStorage.getItem("marcador-token");
+}
 
 function useMatchSocket() {
   const [match, setMatch] = useState(initialMatchState);
@@ -18,7 +23,11 @@ function useMatchSocket() {
     let disposed = false;
 
     function connect() {
-      const socket = new WebSocket(`${socketUrl}?matchId=${encodeURIComponent(matchId)}`);
+      const token = getToken();
+      const tokenQuery = token && !isOverlay ? `&token=${encodeURIComponent(token)}` : "";
+      const socket = new WebSocket(
+        `${socketUrl}?matchId=${encodeURIComponent(matchId)}${tokenQuery}`
+      );
       socketRef.current = socket;
 
       socket.addEventListener("open", () => setConnected(true));
@@ -76,7 +85,7 @@ function MatchScore({ match, compact = false }) {
   );
 }
 
-function ControlPage({ match, connected, sendAction }) {
+function ControlPage({ match, connected, sendAction, onLogout }) {
   const [homeName, setHomeName] = useState(match.home.name);
   const [awayName, setAwayName] = useState(match.away.name);
 
@@ -91,8 +100,14 @@ function ControlPage({ match, connected, sendAction }) {
   }
 
   async function createMatch() {
-    const response = await fetch(`${serverUrl}/matches`, { method: "POST" });
-    if (!response.ok) return;
+    const response = await fetch(`${serverUrl}/matches`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${getToken()}` }
+    });
+    if (!response.ok) {
+      onLogout();
+      return;
+    }
     const createdMatch = await response.json();
     window.location.href = `/control/${createdMatch.matchId}`;
   }
@@ -104,7 +119,10 @@ function ControlPage({ match, connected, sendAction }) {
           <p className="eyebrow">PANEL DE CONTROL · SALA {match.matchId}</p>
           <h1>Marcador en tiempo real</h1>
         </div>
-        <ConnectionStatus connected={connected} />
+        <div className="header-actions">
+          <ConnectionStatus connected={connected} />
+          <button onClick={onLogout}>Cerrar sesión</button>
+        </div>
       </header>
 
       <MatchScore match={match} />
@@ -187,9 +205,59 @@ function OverlayPage({ match }) {
   );
 }
 
+function LoginPage({ onLogin }) {
+  const [username, setUsername] = useState("admin");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
+  async function submit(event) {
+    event.preventDefault();
+    setError("");
+    const response = await fetch(`${serverUrl}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+    if (!response.ok) {
+      setError("Usuario o contraseña incorrectos.");
+      return;
+    }
+    const { token } = await response.json();
+    window.localStorage.setItem("marcador-token", token);
+    onLogin();
+  }
+
+  return (
+    <main className="login-page">
+      <form className="login-card" onSubmit={submit}>
+        <p className="eyebrow">MARCADOR EN TIEMPO REAL</p>
+        <h1>Acceso al panel</h1>
+        <p>El overlay de OBS no necesita iniciar sesión.</p>
+        <label>
+          Usuario
+          <input value={username} onChange={(event) => setUsername(event.target.value)} />
+        </label>
+        <label>
+          Contraseña
+          <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+        </label>
+        {error && <p className="form-error">{error}</p>}
+        <button className="primary" type="submit">Entrar</button>
+      </form>
+    </main>
+  );
+}
+
 function App() {
+  const [authenticated, setAuthenticated] = useState(Boolean(getToken()));
   const { match, connected, sendAction } = useMatchSocket();
-  const isOverlay = window.location.pathname.startsWith("/overlay");
+
+  function logout() {
+    window.localStorage.removeItem("marcador-token");
+    setAuthenticated(false);
+  }
+
+  if (!isOverlay && !authenticated) return <LoginPage onLogin={() => setAuthenticated(true)} />;
 
   return isOverlay ? (
     <OverlayPage match={match} />
@@ -198,6 +266,7 @@ function App() {
       match={match}
       connected={connected}
       sendAction={sendAction}
+      onLogout={logout}
     />
   );
 }

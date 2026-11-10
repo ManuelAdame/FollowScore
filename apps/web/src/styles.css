@@ -40,6 +40,59 @@ button:focus-visible {
   padding: 56px 24px;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.header-actions button {
+  padding: 8px 12px;
+  color: #cbd5e1;
+  font-size: 0.8rem;
+}
+
+.login-page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+}
+
+.login-card {
+  display: grid;
+  width: min(420px, 100%);
+  gap: 18px;
+  padding: 32px;
+  background: #172033;
+  border: 1px solid #334155;
+  border-radius: 18px;
+}
+
+.login-card h1 {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.login-card > p:not(.eyebrow):not(.form-error) {
+  margin: -4px 0 4px;
+  color: #94a3b8;
+}
+
+.login-card label {
+  display: grid;
+  gap: 8px;
+  color: #cbd5e1;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.form-error {
+  margin: 0;
+  color: #fca5a5;
+  font-size: 0.9rem;
+}
+
 .app-header {
   display: flex;
   align-items: flex-start;
@@ -286,8 +339,15 @@ input:focus {
     display: block;
   }
 
-  .status {
+  .header-actions {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
     margin-top: 18px;
+  }
+
+  .status {
+    margin-top: 0;
   }
 
   .team-controls,
