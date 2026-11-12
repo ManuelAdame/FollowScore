@@ -38,9 +38,24 @@ El overlay de OBS no requiere autenticación.
 3. El panel envía acciones (`INCREMENT_SCORE`, `DECREMENT_SCORE`, `UPDATE_TEAMS`).
 4. El servidor valida la acción y difunde el nuevo estado solo a esa sala.
 
+## Plantilla de baloncesto
+
+Las salas utilizan actualmente la plantilla de baloncesto:
+
+- Cuatro cuartos de 10 minutos.
+- Prórrogas de 5 minutos desde el quinto periodo.
+- Reloj compartido y controlado por el servidor.
+- Indicador del cuarto o prórroga actual.
+- Puntuaciones sin límite superior.
+- Botones `+1`, `+2`, `+3` y `-1`.
+- El marcador nunca puede bajar de cero.
+
+El botón **Siguiente cuarto** prepara el siguiente periodo con el reloj parado.
+El árbitro puede iniciar, pausar o reiniciar el reloj desde el panel.
+
 ## Próximos pasos
 
-1. Modelar deportes concretos (sets, periodos, saques y faltas).
+1. Añadir faltas, tiempos muertos y posesión.
 2. Persistir partidos y estadísticas en PostgreSQL.
 3. Añadir configuración visual del overlay y una URL pública para OBS.
 4. Probar reconexión, latencia y despliegue.
