@@ -209,11 +209,17 @@ h1 {
   width: 34px;
   height: 34px;
   place-items: center;
+  overflow: hidden;
   color: #fff;
   background: #0369a1;
   border-radius: 50%;
   font-size: 0.65rem;
   font-weight: 900;
+}
+
+.team-badge[src],
+.overlay-logo[src] {
+  object-fit: cover;
 }
 
 .team-badge.away {
@@ -305,16 +311,158 @@ input {
   font: inherit;
 }
 
+textarea,
+select {
+  width: 100%;
+  padding: 12px 14px;
+  color: #f8fafc;
+  background: #0f172a;
+  border: 1px solid #475569;
+  border-radius: 9px;
+  font: inherit;
+}
+
+textarea {
+  resize: vertical;
+}
+
+select {
+  cursor: pointer;
+}
+
 input:focus {
   border-color: #38bdf8;
   outline: 2px solid #38bdf8;
   outline-offset: 1px;
 }
 
+input[type="file"] {
+  padding: 9px;
+  color: #cbd5e1;
+  font-size: 0.8rem;
+}
+
+.logo-previews {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  grid-column: 1 / -1;
+}
+
+.logo-previews > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
 .team-controls {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 16px;
+}
+
+.basket-entry-button {
+  display: block;
+  margin: 20px auto 0;
+  font-size: 1rem;
+}
+
+.basket-entry {
+  margin-top: 20px;
+}
+
+.basket-entry-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.basket-entry-header h2 {
+  margin: 0 0 6px;
+}
+
+.basket-team-tabs,
+.basket-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.basket-team-tabs {
+  margin-top: 20px;
+}
+
+.basket-types {
+  margin-top: 16px;
+}
+
+.basket-types button {
+  display: grid;
+  gap: 4px;
+  min-width: 140px;
+  text-align: left;
+}
+
+.basket-types span {
+  color: #cbd5e1;
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+
+.basket-player-form {
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) auto;
+  align-items: end;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.basket-player-form label,
+.roster-settings label {
+  display: grid;
+  gap: 8px;
+  color: #cbd5e1;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.basket-player-form .form-error {
+  grid-column: 1 / -1;
+}
+
+.roster-settings {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.roster-settings > div:first-child {
+  grid-column: 1 / -1;
+}
+
+.basket-announcement {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 8px 14px;
+  color: #fff;
+  background: #0284c7;
+  animation: announcement-in 180ms ease-out;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.basket-announcement strong {
+  font-size: 1rem;
+}
+
+@keyframes announcement-in {
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
 
 .team-control {
@@ -445,6 +593,7 @@ input:focus {
   height: 38px;
   flex: 0 0 38px;
   place-items: center;
+  overflow: hidden;
   color: #fff;
   background: #0369a1;
   border: 2px solid #7dd3fc;
@@ -586,11 +735,16 @@ input:focus {
 
   .team-controls,
   .scoreboard,
-  .match-settings {
+  .match-settings,
+  .roster-settings {
     grid-template-columns: 1fr;
   }
 
   .match-settings > div:first-child {
+    grid-column: auto;
+  }
+
+  .roster-settings > div:first-child {
     grid-column: auto;
   }
 
@@ -601,6 +755,10 @@ input:focus {
 
   .obs-actions {
     margin-top: 18px;
+  }
+
+  .basket-player-form {
+    grid-template-columns: 1fr;
   }
 
   .overlay-page {
