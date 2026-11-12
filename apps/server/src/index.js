@@ -18,6 +18,7 @@ const webSocketServer = new WebSocketServer({ server, path: "/ws" });
 const matches = new Map([["demo", structuredClone(initialMatchState)]]);
 const clientsByMatch = new Map();
 const sessions = new Set();
+const announcementTimers = new Map();
 const adminUser = process.env.ADMIN_USER ?? "admin";
 const adminPassword = process.env.ADMIN_PASSWORD ?? "admin123";
 
@@ -125,12 +126,60 @@ function handleAction(matchId, action, canEdit) {
   } else if (action.type === actionTypes.updateTeams) {
     const homeName = action.homeName?.trim();
     const awayName = action.awayName?.trim();
-    if (!homeName || !awayName || homeName.length > 40 || awayName.length > 40) return;
+    const validLogo = (logo) => logo === null || (
+      typeof logo === "string" &&
+      logo.length <= 700000 &&
+      /^data:image\/(png|jpeg|webp|gif);base64,[a-z0-9+/]+=*$/i.test(logo)
+    );
+    if (
+      !homeName ||
+      !awayName ||
+      homeName.length > 40 ||
+      awayName.length > 40 ||
+      !validLogo(action.homeLogo ?? null) ||
+      !validLogo(action.awayLogo ?? null)
+    ) return;
     nextMatch = {
       ...match,
-      home: { ...match.home, name: homeName },
-      away: { ...match.away, name: awayName }
+      home: { ...match.home, name: homeName, logo: action.homeLogo ?? null },
+      away: { ...match.away, name: awayName, logo: action.awayLogo ?? null }
     };
+  } else if (action.type === actionTypes.updateRoster) {
+    if (action.team !== "home" && action.team !== "away") return;
+    if (
+      !Array.isArray(action.players) ||
+      action.players.length > 30 ||
+      action.players.some((player) => typeof player !== "string" || !player.trim() || player.trim().length > 40)
+    ) return;
+    const players = [...new Set(action.players.map((player) => player.trim()))];
+    nextMatch = {
+      ...match,
+      [action.team]: { ...match[action.team], players }
+    };
+  } else if (action.type === actionTypes.registerBasket) {
+    const team = action.team;
+    const points = action.points;
+    const player = typeof action.player === "string" ? action.player.trim() : "";
+    if (
+      (team !== "home" && team !== "away") ||
+      ![1, 2, 3].includes(points) ||
+      !player ||
+      !match[team].players?.includes(player)
+    ) return;
+    nextMatch = {
+      ...match,
+      [team]: { ...match[team], score: match[team].score + points },
+      basketAnnouncement: { team, player, points }
+    };
+    if (announcementTimers.has(matchId)) clearTimeout(announcementTimers.get(matchId));
+    const timer = setTimeout(() => {
+      const currentMatch = getMatch(matchId);
+      if (currentMatch.basketAnnouncement) {
+        publishMatch(matchId, { ...currentMatch, basketAnnouncement: null });
+      }
+      announcementTimers.delete(matchId);
+    }, 5000);
+    announcementTimers.set(matchId, timer);
   } else if (action.type === actionTypes.updateOverlay) {
     const header = action.header?.trim();
     const footer = action.footer?.trim();

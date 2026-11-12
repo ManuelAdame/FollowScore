@@ -63,13 +63,19 @@ function ConnectionStatus({ connected }) {
   return <span className={connected ? "status online" : "status"}><span className="status-dot" />{connected ? "Conectado" : "Conectando..."}</span>;
 }
 
+function TeamLogo({ team, className = "" }) {
+  return team.logo
+    ? <img className={className} src={team.logo} alt={`Logo de ${team.name}`} />
+    : <span className={className}>{team.name.slice(0, 3).toUpperCase()}</span>;
+}
+
 function MatchScore({ match, compact = false }) {
   return (
     <section className={`scoreboard ${compact ? "compact" : ""}`}>
       {["home", "away"].map((team) => (
         <article className="team" key={team}>
           <div className="team-heading">
-            <span className={`team-badge ${team}`}>{match[team].name.slice(0, 3).toUpperCase()}</span>
+            <TeamLogo team={match[team]} className={`team-badge ${team}`} />
             <span className="team-label">{team === "home" ? "LOCAL" : "VISITANTE"}</span>
           </div>
           <h2>{match[team].name}</h2>
@@ -77,6 +83,47 @@ function MatchScore({ match, compact = false }) {
           <div className="team-fouls"><span>FALTAS</span><b>{match[team].fouls}</b>{match[team].fouls >= 5 && <em>BONUS</em>}</div>
         </article>
       ))}
+    </section>
+  );
+}
+
+function BasketEntry({ match, sendAction, onClose }) {
+  const [team, setTeam] = useState("home");
+  const [points, setPoints] = useState(null);
+  const [player, setPlayer] = useState("");
+  const players = match[team].players ?? [];
+
+  function choosePoints(value) {
+    setPoints(value);
+    setPlayer("");
+  }
+
+  function submit(event) {
+    event.preventDefault();
+    if (points && player) {
+      sendAction(actionTypes.registerBasket, { team, points, player });
+      onClose();
+    }
+  }
+
+  return (
+    <section className="basket-entry control-card">
+      <div className="basket-entry-header"><div><h2>Registrar canasta</h2><p>Elige primero el tipo de tiro y después el jugador.</p></div><button onClick={onClose}>Cerrar</button></div>
+      <div className="basket-team-tabs">
+        {["home", "away"].map((item) => <button className={team === item ? "primary" : ""} key={item} onClick={() => { setTeam(item); setPoints(null); setPlayer(""); }}>{match[item].name}</button>)}
+      </div>
+      <div className="basket-types">
+        {[{ value: 1, label: "Tiro libre", points: "1 punto" }, { value: 2, label: "Canasta de 2", points: "2 puntos" }, { value: 3, label: "Triple", points: "3 puntos" }].map((shot) => (
+          <button className={points === shot.value ? "primary" : ""} key={shot.value} onClick={() => choosePoints(shot.value)}><strong>{shot.label}</strong><span>{shot.points}</span></button>
+        ))}
+      </div>
+      {points && (
+        <form className="basket-player-form" onSubmit={submit}>
+          <label>Jugador que ha anotado<select value={player} onChange={(event) => setPlayer(event.target.value)} required><option value="">Selecciona un jugador</option>{players.map((name) => <option key={name} value={name}>{name}</option>)}</select></label>
+          {players.length === 0 && <p className="form-error">Añade jugadores en la plantilla antes de registrar una canasta.</p>}
+          <button className="primary" type="submit" disabled={!player}>Confirmar {points} punto{points > 1 ? "s" : ""}</button>
+        </form>
+      )}
     </section>
   );
 }
@@ -98,20 +145,37 @@ function BasketballClock({ match, sendAction }) {
 }
 
 function ControlPage({ match, connected, sendAction, onLogout }) {
+  const [showBasketEntry, setShowBasketEntry] = useState(false);
   const [homeName, setHomeName] = useState(match.home.name);
   const [awayName, setAwayName] = useState(match.away.name);
+  const [homeLogo, setHomeLogo] = useState(match.home.logo ?? null);
+  const [awayLogo, setAwayLogo] = useState(match.away.logo ?? null);
   const [overlayHeader, setOverlayHeader] = useState(match.overlay?.header ?? "");
   const [overlayFooter, setOverlayFooter] = useState(match.overlay?.footer ?? "");
   useEffect(() => {
     setHomeName(match.home.name);
     setAwayName(match.away.name);
+    setHomeLogo(match.home.logo ?? null);
+    setAwayLogo(match.away.logo ?? null);
     setOverlayHeader(match.overlay?.header ?? "");
     setOverlayFooter(match.overlay?.footer ?? "");
-  }, [match.home.name, match.away.name, match.overlay?.header, match.overlay?.footer]);
+  }, [match.home.name, match.away.name, match.home.logo, match.away.logo, match.overlay?.header, match.overlay?.footer]);
 
   function saveNames(event) {
     event.preventDefault();
-    sendAction(actionTypes.updateTeams, { homeName, awayName });
+    sendAction(actionTypes.updateTeams, { homeName, awayName, homeLogo, awayLogo });
+  }
+  function readLogo(event, setLogo) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/") || file.size > 500000) {
+      event.target.value = "";
+      window.alert("Elige una imagen de máximo 500 KB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.addEventListener("load", () => setLogo(String(reader.result)));
+    reader.readAsDataURL(file);
   }
   function saveOverlay(event) {
     event.preventDefault();
@@ -137,6 +201,7 @@ function ControlPage({ match, connected, sendAction, onLogout }) {
       </header>
       <div className="period-banner"><span>{match.periodLabel}</span><span>{match.clockRunning ? "EN JUEGO" : "RELOJ PARADO"}</span></div>
       <MatchScore match={match} />
+      {showBasketEntry ? <BasketEntry match={match} sendAction={sendAction} onClose={() => setShowBasketEntry(false)} /> : <button className="basket-entry-button primary" onClick={() => setShowBasketEntry(true)}>Registrar canasta</button>}
       <BasketballClock match={match} sendAction={sendAction} />
       <section className="control-card">
         <div><h2>Puntos</h2><p>Elige la acción correspondiente. La resta nunca baja de cero.</p></div>
@@ -174,8 +239,20 @@ function ControlPage({ match, connected, sendAction, onLogout }) {
         <div><h2>Datos del partido</h2><p>Cambia los nombres que verán los espectadores.</p></div>
         <label>Equipo local<input value={homeName} maxLength="40" onChange={(event) => setHomeName(event.target.value)} /></label>
         <label>Equipo visitante<input value={awayName} maxLength="40" onChange={(event) => setAwayName(event.target.value)} /></label>
+        <label>Logo local<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event) => readLogo(event, setHomeLogo)} /></label>
+        <label>Logo visitante<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event) => readLogo(event, setAwayLogo)} /></label>
+        <div className="logo-previews">
+          <div><span>Vista previa local</span><TeamLogo team={{ name: homeName, logo: homeLogo }} className="team-badge home" /></div>
+          <div><span>Vista previa visitante</span><TeamLogo team={{ name: awayName, logo: awayLogo }} className="team-badge away" /></div>
+        </div>
         <button className="primary" type="submit">Guardar nombres</button>
       </form>
+      <section className="control-card roster-settings">
+        <div><h2>Plantilla de jugadores</h2><p>Escribe un jugador por línea. Estos nombres aparecerán al registrar una canasta.</p></div>
+        {["home", "away"].map((team) => (
+          <label key={team}>{match[team].name}<textarea defaultValue={(match[team].players ?? []).join("\n")} rows="5" onBlur={(event) => sendAction(actionTypes.updateRoster, { team, players: event.target.value.split("\n").map((player) => player.trim()).filter(Boolean) })} /></label>
+        ))}
+      </section>
       <form className="control-card overlay-settings" onSubmit={saveOverlay}>
         <div><h2>Cabecera y línea inferior</h2><p>Estos textos aparecerán en el overlay del marcador.</p></div>
         <label>Cabecera<input value={overlayHeader} maxLength="80" onChange={(event) => setOverlayHeader(event.target.value)} /></label>
@@ -191,10 +268,11 @@ function OverlayPage({ match }) {
   return (
     <main className="overlay-page">
       <div className="overlay-score">
+        {match.basketAnnouncement && <div className="basket-announcement"><strong>{match.basketAnnouncement.player}</strong><span>{match.basketAnnouncement.points === 3 ? "TRIPLE" : `${match.basketAnnouncement.points} PUNTOS`}</span></div>}
         <div className="overlay-header">{match.overlay?.header ?? "BALONCESTO · PARTIDO EN DIRECTO"}</div>
         <div className="overlay-main">
-          <div className="overlay-team"><span className="overlay-logo home">{match.home.name.slice(0, 3).toUpperCase()}</span><strong>{match.home.name}</strong><b>{match.home.score}</b><small>F {match.home.fouls}</small></div>
-          <div className="overlay-team away"><span className="overlay-logo away">{match.away.name.slice(0, 3).toUpperCase()}</span><strong>{match.away.name}</strong><b>{match.away.score}</b><small>F {match.away.fouls}</small></div>
+          <div className="overlay-team"><TeamLogo team={match.home} className="overlay-logo home" /><strong>{match.home.name}</strong><b>{match.home.score}</b><small>F {match.home.fouls}</small></div>
+          <div className="overlay-team away"><TeamLogo team={match.away} className="overlay-logo away" /><strong>{match.away.name}</strong><b>{match.away.score}</b><small>F {match.away.fouls}</small></div>
           <div className="overlay-period"><span>{formatPeriod(match.period)}</span></div>
           <div className="overlay-time">{formatClock(match.clockSeconds)}</div>
         </div>
