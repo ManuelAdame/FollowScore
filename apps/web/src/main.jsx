@@ -21,15 +21,11 @@ function useMatchSocket() {
   useEffect(() => {
     let reconnectTimer;
     let disposed = false;
-
     function connect() {
       const token = getToken();
       const tokenQuery = token && !isOverlay ? `&token=${encodeURIComponent(token)}` : "";
-      const socket = new WebSocket(
-        `${socketUrl}?matchId=${encodeURIComponent(matchId)}${tokenQuery}`
-      );
+      const socket = new WebSocket(`${socketUrl}?matchId=${encodeURIComponent(matchId)}${tokenQuery}`);
       socketRef.current = socket;
-
       socket.addEventListener("open", () => setConnected(true));
       socket.addEventListener("close", () => {
         setConnected(false);
@@ -40,9 +36,7 @@ function useMatchSocket() {
         if (message.type === "MATCH_STATE") setMatch(message.payload);
       });
     }
-
     connect();
-
     return () => {
       disposed = true;
       clearTimeout(reconnectTimer);
@@ -50,25 +44,23 @@ function useMatchSocket() {
     };
   }, []);
 
-  function sendAction(type, teamOrPayload) {
+  function sendAction(type, payload = {}) {
     if (socketRef.current?.readyState !== WebSocket.OPEN) return;
-    const payload =
-      typeof teamOrPayload === "string"
-        ? { type, team: teamOrPayload }
-        : { type, ...teamOrPayload };
-    socketRef.current.send(JSON.stringify(payload));
+    socketRef.current.send(JSON.stringify({ type, ...payload }));
   }
-
   return { match, connected, sendAction };
 }
 
+function formatClock(seconds) {
+  return `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
+}
+
+function formatPeriod(period) {
+  return period >= 5 ? `Pr${period - 4}` : `T${period}`;
+}
+
 function ConnectionStatus({ connected }) {
-  return (
-    <span className={connected ? "status online" : "status"}>
-      <span className="status-dot" />
-      {connected ? "Conectado" : "Conectando..."}
-    </span>
-  );
+  return <span className={connected ? "status online" : "status"}><span className="status-dot" />{connected ? "Conectado" : "Conectando..."}</span>;
 }
 
 function MatchScore({ match, compact = false }) {
@@ -76,11 +68,31 @@ function MatchScore({ match, compact = false }) {
     <section className={`scoreboard ${compact ? "compact" : ""}`}>
       {["home", "away"].map((team) => (
         <article className="team" key={team}>
-          <span className="team-label">{team === "home" ? "LOCAL" : "VISITANTE"}</span>
+          <div className="team-heading">
+            <span className={`team-badge ${team}`}>{match[team].name.slice(0, 3).toUpperCase()}</span>
+            <span className="team-label">{team === "home" ? "LOCAL" : "VISITANTE"}</span>
+          </div>
           <h2>{match[team].name}</h2>
           <strong>{match[team].score}</strong>
+          <div className="team-fouls"><span>FALTAS</span><b>{match[team].fouls}</b>{match[team].fouls >= 5 && <em>BONUS</em>}</div>
         </article>
       ))}
+    </section>
+  );
+}
+
+function BasketballClock({ match, sendAction }) {
+  return (
+    <section className="clock-card">
+      <span className="team-label">BALONCESTO · {match.periodLabel.toUpperCase()}</span>
+      <strong className={match.clockSeconds <= 60 ? "clock warning" : "clock"}>{formatClock(match.clockSeconds)}</strong>
+      <div className="clock-actions">
+        <button onClick={() => sendAction(match.clockRunning ? actionTypes.stopClock : actionTypes.startClock)}>
+          {match.clockRunning ? "Pausar reloj" : "Iniciar reloj"}
+        </button>
+        <button onClick={() => sendAction(actionTypes.resetClock)}>Reiniciar cuarto</button>
+        <button onClick={() => sendAction(actionTypes.nextPeriod)}>Siguiente cuarto</button>
+      </div>
     </section>
   );
 }
@@ -88,17 +100,23 @@ function MatchScore({ match, compact = false }) {
 function ControlPage({ match, connected, sendAction, onLogout }) {
   const [homeName, setHomeName] = useState(match.home.name);
   const [awayName, setAwayName] = useState(match.away.name);
-
+  const [overlayHeader, setOverlayHeader] = useState(match.overlay?.header ?? "");
+  const [overlayFooter, setOverlayFooter] = useState(match.overlay?.footer ?? "");
   useEffect(() => {
     setHomeName(match.home.name);
     setAwayName(match.away.name);
-  }, [match.home.name, match.away.name]);
+    setOverlayHeader(match.overlay?.header ?? "");
+    setOverlayFooter(match.overlay?.footer ?? "");
+  }, [match.home.name, match.away.name, match.overlay?.header, match.overlay?.footer]);
 
   function saveNames(event) {
     event.preventDefault();
     sendAction(actionTypes.updateTeams, { homeName, awayName });
   }
-
+  function saveOverlay(event) {
+    event.preventDefault();
+    sendAction(actionTypes.updateOverlay, { header: overlayHeader, footer: overlayFooter });
+  }
   async function createMatch() {
     const response = await fetch(`${serverUrl}/matches`, {
       method: "POST",
@@ -111,85 +129,60 @@ function ControlPage({ match, connected, sendAction, onLogout }) {
     const createdMatch = await response.json();
     window.location.href = `/control/${createdMatch.matchId}`;
   }
-
   return (
     <main className="control-page">
       <header className="app-header">
-        <div>
-          <p className="eyebrow">PANEL DE CONTROL · SALA {match.matchId}</p>
-          <h1>Marcador en tiempo real</h1>
-        </div>
-        <div className="header-actions">
-          <ConnectionStatus connected={connected} />
-          <button onClick={onLogout}>Cerrar sesión</button>
-        </div>
+        <div><p className="eyebrow">BALONCESTO · SALA {match.matchId}</p><h1>Marcador en tiempo real</h1></div>
+        <div className="header-actions"><ConnectionStatus connected={connected} /><button onClick={onLogout}>Cerrar sesión</button></div>
       </header>
-
+      <div className="period-banner"><span>{match.periodLabel}</span><span>{match.clockRunning ? "EN JUEGO" : "RELOJ PARADO"}</span></div>
       <MatchScore match={match} />
-
+      <BasketballClock match={match} sendAction={sendAction} />
       <section className="control-card">
-        <div>
-          <h2>Controles rápidos</h2>
-          <p>Los cambios se reflejan al instante en el overlay de OBS.</p>
-        </div>
+        <div><h2>Puntos</h2><p>Elige la acción correspondiente. La resta nunca baja de cero.</p></div>
         <div className="team-controls">
           {["home", "away"].map((team) => (
             <div className="team-control" key={team}>
               <span>{match[team].name}</span>
-              <div>
-                <button
-                  aria-label={`Restar punto a ${match[team].name}`}
-                  onClick={() => sendAction(actionTypes.decrementScore, team)}
-                >
-                  −
-                </button>
-                <button
-                  className="primary"
-                  aria-label={`Sumar punto a ${match[team].name}`}
-                  onClick={() => sendAction(actionTypes.incrementScore, team)}
-                >
-                  + Punto
-                </button>
+              <div className="score-buttons">
+                <button onClick={() => sendAction(actionTypes.changeScore, { team, delta: -1 })}>−1</button>
+                <button className="primary" onClick={() => sendAction(actionTypes.changeScore, { team, delta: 1 })}>+1</button>
+                <button className="primary" onClick={() => sendAction(actionTypes.changeScore, { team, delta: 2 })}>+2</button>
+                <button className="primary" onClick={() => sendAction(actionTypes.changeScore, { team, delta: 3 })}>+3</button>
               </div>
             </div>
           ))}
         </div>
-        <button
-          className="reset"
-          onClick={() => sendAction(actionTypes.resetScore)}
-        >
-          Reiniciar marcador
-        </button>
+        <button className="reset" onClick={() => sendAction(actionTypes.resetScore)}>Reiniciar puntos</button>
       </section>
-
-      <form className="control-card match-settings" onSubmit={saveNames}>
-        <div>
-          <h2>Datos del partido</h2>
-          <p>Cambia los nombres que verán los espectadores en el overlay.</p>
+      <section className="control-card">
+        <div><h2>Faltas de equipo</h2><p>Se reinician automáticamente al pasar al siguiente cuarto.</p></div>
+        <div className="team-controls">
+          {["home", "away"].map((team) => (
+            <div className="team-control foul-control" key={team}>
+              <span>{match[team].name}<strong>{match[team].fouls}</strong></span>
+              <div className="score-buttons">
+                <button onClick={() => sendAction(actionTypes.changeFouls, { team, delta: -1 })}>−1</button>
+                <button className="primary" onClick={() => sendAction(actionTypes.changeFouls, { team, delta: 1 })}>+1 falta</button>
+              </div>
+            </div>
+          ))}
         </div>
-        <label>
-          Equipo local
-          <input value={homeName} maxLength="40" onChange={(event) => setHomeName(event.target.value)} />
-        </label>
-        <label>
-          Equipo visitante
-          <input value={awayName} maxLength="40" onChange={(event) => setAwayName(event.target.value)} />
-        </label>
+        <button className="reset" onClick={() => sendAction(actionTypes.resetFouls)}>Reiniciar faltas</button>
+      </section>
+      <form className="control-card match-settings" onSubmit={saveNames}>
+        <div><h2>Datos del partido</h2><p>Cambia los nombres que verán los espectadores.</p></div>
+        <label>Equipo local<input value={homeName} maxLength="40" onChange={(event) => setHomeName(event.target.value)} /></label>
+        <label>Equipo visitante<input value={awayName} maxLength="40" onChange={(event) => setAwayName(event.target.value)} /></label>
         <button className="primary" type="submit">Guardar nombres</button>
       </form>
-
-      <aside className="obs-help">
-        <div>
-          <span className="eyebrow">URL PARA OBS</span>
-          <code>{window.location.origin}/overlay/{match.matchId}</code>
-        </div>
-        <div className="obs-actions">
-          <button onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/overlay/${match.matchId}`)}>
-            Copiar URL
-          </button>
-          <button className="primary" onClick={createMatch}>Nuevo partido</button>
-        </div>
-      </aside>
+      <form className="control-card overlay-settings" onSubmit={saveOverlay}>
+        <div><h2>Cabecera y línea inferior</h2><p>Estos textos aparecerán en el overlay del marcador.</p></div>
+        <label>Cabecera<input value={overlayHeader} maxLength="80" onChange={(event) => setOverlayHeader(event.target.value)} /></label>
+        <label>Línea inferior<input value={overlayFooter} maxLength="80" onChange={(event) => setOverlayFooter(event.target.value)} /></label>
+        <button className="primary" type="submit">Guardar textos</button>
+      </form>
+      <aside className="obs-help"><div><span className="eyebrow">URL PARA OBS</span><code>{window.location.origin}/overlay/{match.matchId}</code></div><div className="obs-actions"><button onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/overlay/${match.matchId}`)}>Copiar URL</button><button className="primary" onClick={createMatch}>Nuevo partido</button></div></aside>
     </main>
   );
 }
@@ -198,8 +191,14 @@ function OverlayPage({ match }) {
   return (
     <main className="overlay-page">
       <div className="overlay-score">
-        <div className="overlay-title">PARTIDO EN DIRECTO</div>
-        <MatchScore match={match} compact />
+        <div className="overlay-header">{match.overlay?.header ?? "BALONCESTO · PARTIDO EN DIRECTO"}</div>
+        <div className="overlay-main">
+          <div className="overlay-team"><span className="overlay-logo home">{match.home.name.slice(0, 3).toUpperCase()}</span><strong>{match.home.name}</strong><b>{match.home.score}</b><small>F {match.home.fouls}</small></div>
+          <div className="overlay-team away"><span className="overlay-logo away">{match.away.name.slice(0, 3).toUpperCase()}</span><strong>{match.away.name}</strong><b>{match.away.score}</b><small>F {match.away.fouls}</small></div>
+          <div className="overlay-period"><span>{formatPeriod(match.period)}</span></div>
+          <div className="overlay-time">{formatClock(match.clockSeconds)}</div>
+        </div>
+        <div className="overlay-footer">{match.overlay?.footer ?? "PABELLÓN · JORNADA"}</div>
       </div>
     </main>
   );
@@ -209,66 +208,23 @@ function LoginPage({ onLogin }) {
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-
   async function submit(event) {
     event.preventDefault();
-    setError("");
-    const response = await fetch(`${serverUrl}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password })
-    });
-    if (!response.ok) {
-      setError("Usuario o contraseña incorrectos.");
-      return;
-    }
+    const response = await fetch(`${serverUrl}/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password }) });
+    if (!response.ok) { setError("Usuario o contraseña incorrectos."); return; }
     const { token } = await response.json();
     window.localStorage.setItem("marcador-token", token);
     onLogin();
   }
-
-  return (
-    <main className="login-page">
-      <form className="login-card" onSubmit={submit}>
-        <p className="eyebrow">MARCADOR EN TIEMPO REAL</p>
-        <h1>Acceso al panel</h1>
-        <p>El overlay de OBS no necesita iniciar sesión.</p>
-        <label>
-          Usuario
-          <input value={username} onChange={(event) => setUsername(event.target.value)} />
-        </label>
-        <label>
-          Contraseña
-          <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
-        </label>
-        {error && <p className="form-error">{error}</p>}
-        <button className="primary" type="submit">Entrar</button>
-      </form>
-    </main>
-  );
+  return <main className="login-page"><form className="login-card" onSubmit={submit}><p className="eyebrow">MARCADOR EN TIEMPO REAL</p><h1>Acceso al panel</h1><p>El overlay de OBS no necesita iniciar sesión.</p><label>Usuario<input value={username} onChange={(event) => setUsername(event.target.value)} /></label><label>Contraseña<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>{error && <p className="form-error">{error}</p>}<button className="primary" type="submit">Entrar</button></form></main>;
 }
 
 function App() {
   const [authenticated, setAuthenticated] = useState(Boolean(getToken()));
   const { match, connected, sendAction } = useMatchSocket();
-
-  function logout() {
-    window.localStorage.removeItem("marcador-token");
-    setAuthenticated(false);
-  }
-
+  function logout() { window.localStorage.removeItem("marcador-token"); setAuthenticated(false); }
   if (!isOverlay && !authenticated) return <LoginPage onLogin={() => setAuthenticated(true)} />;
-
-  return isOverlay ? (
-    <OverlayPage match={match} />
-  ) : (
-    <ControlPage
-      match={match}
-      connected={connected}
-      sendAction={sendAction}
-      onLogout={logout}
-    />
-  );
+  return isOverlay ? <OverlayPage match={match} /> : <ControlPage match={match} connected={connected} sendAction={sendAction} onLogout={logout} />;
 }
 
 createRoot(document.getElementById("root")).render(<App />);

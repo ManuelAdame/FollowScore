@@ -1,16 +1,28 @@
 export const initialMatchState = {
   matchId: "demo",
+  sport: "basketball",
   status: "live",
-  home: { name: "Local", score: 0 },
-  away: { name: "Visitante", score: 0 },
+  home: { name: "Local", score: 0, fouls: 0 },
+  away: { name: "Visitante", score: 0, fouls: 0 },
+  overlay: { header: "BALONCESTO · PARTIDO EN DIRECTO", footer: "PABELLÓN · JORNADA" },
+  period: 1,
+  periodLabel: "1.º cuarto",
+  clockSeconds: 600,
+  clockRunning: false,
   updatedAt: null
 };
 
 export const actionTypes = {
-  incrementScore: "INCREMENT_SCORE",
-  decrementScore: "DECREMENT_SCORE",
+  changeScore: "CHANGE_SCORE",
+  changeFouls: "CHANGE_FOULS",
   resetScore: "RESET_SCORE",
-  updateTeams: "UPDATE_TEAMS"
+  resetFouls: "RESET_FOULS",
+  updateTeams: "UPDATE_TEAMS",
+  updateOverlay: "UPDATE_OVERLAY",
+  startClock: "START_CLOCK",
+  stopClock: "STOP_CLOCK",
+  resetClock: "RESET_CLOCK",
+  nextPeriod: "NEXT_PERIOD"
 };
 
 export function isScoreAction(action) {
@@ -22,4 +34,12 @@ export function createMatchState(matchId) {
     ...structuredClone(initialMatchState),
     matchId
   };
+}
+
+export function getPeriodDuration(period) {
+  return period >= 5 ? 300 : 600;
+}
+
+export function getPeriodLabel(period) {
+  return period >= 5 ? `Prórroga ${period - 4}` : `${period}.º cuarto`;
 }
