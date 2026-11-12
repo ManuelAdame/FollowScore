@@ -14,6 +14,10 @@ body {
   margin: 0;
 }
 
+body.overlay-mode {
+  background: transparent;
+}
+
 button {
   padding: 11px 18px;
   color: inherit;
@@ -443,13 +447,23 @@ input[type="file"] {
 }
 
 .basket-announcement {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  z-index: 2;
+  width: 100%;
+  transform: translateY(0);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 14px;
   padding: 8px 14px;
   color: #fff;
-  background: #0284c7;
+  background: #648798;
+  border: 1px solid rgba(125, 211, 252, 0.8);
+  border-bottom: 0;
+  border-radius: 5px 5px 0 0;
+  box-shadow: 0 5px 16px rgba(2, 8, 23, 0.5);
   animation: announcement-in 180ms ease-out;
   font-size: 0.8rem;
   letter-spacing: 0.08em;
@@ -461,7 +475,7 @@ input[type="file"] {
 }
 
 @keyframes announcement-in {
-  from { transform: translateY(-100%); opacity: 0; }
+  from { transform: translateY(12px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
 
@@ -534,13 +548,14 @@ input[type="file"] {
 
 .overlay-page {
   min-height: 100vh;
-  padding: 28px;
+  padding: 78px 28px 28px;
   background: transparent;
 }
 
 .overlay-score {
+  position: relative;
   width: min(980px, 100%);
-  overflow: hidden;
+  overflow: visible;
   background: rgba(15, 23, 42, 0.96);
   border: 2px solid rgba(148, 163, 184, 0.65);
   border-radius: 5px;
@@ -762,7 +777,7 @@ input[type="file"] {
   }
 
   .overlay-page {
-    padding: 12px;
+    padding: 62px 12px 12px;
   }
 
   .overlay-main {

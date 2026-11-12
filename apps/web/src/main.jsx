@@ -300,6 +300,10 @@ function LoginPage({ onLogin }) {
 function App() {
   const [authenticated, setAuthenticated] = useState(Boolean(getToken()));
   const { match, connected, sendAction } = useMatchSocket();
+  useEffect(() => {
+    document.body.classList.toggle("overlay-mode", isOverlay);
+    return () => document.body.classList.remove("overlay-mode");
+  }, []);
   function logout() { window.localStorage.removeItem("marcador-token"); setAuthenticated(false); }
   if (!isOverlay && !authenticated) return <LoginPage onLogin={() => setAuthenticated(true)} />;
   return isOverlay ? <OverlayPage match={match} /> : <ControlPage match={match} connected={connected} sendAction={sendAction} onLogout={logout} />;
