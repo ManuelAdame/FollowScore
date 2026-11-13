@@ -4,9 +4,8 @@ import crypto from "node:crypto";
 import { WebSocketServer } from "ws";
 import {
   actionTypes,
+  applyMatchAction,
   createMatchState,
-  getPeriodDuration,
-  getPeriodLabel,
   initialMatchState,
   isScoreAction
 } from "@marcador/shared";
@@ -83,94 +82,9 @@ function publishMatch(matchId, match) {
 function handleAction(matchId, action, canEdit) {
   if (!canEdit || !isScoreAction(action)) return;
   const match = getMatch(matchId);
-  let nextMatch = match;
-
-  if (action.type === actionTypes.changeScore) {
-    if (
-      (action.team !== "home" && action.team !== "away") ||
-      !Number.isInteger(action.delta) ||
-      ![-3, -2, -1, 1, 2, 3].includes(action.delta)
-    ) return;
-    nextMatch = {
-      ...match,
-      [action.team]: {
-        ...match[action.team],
-        score: Math.max(0, match[action.team].score + action.delta)
-      }
-    };
-  } else if (action.type === actionTypes.changeFouls) {
-    if (
-      (action.team !== "home" && action.team !== "away") ||
-      !Number.isInteger(action.delta) ||
-      ![-1, 1].includes(action.delta)
-    ) return;
-    nextMatch = {
-      ...match,
-      [action.team]: {
-        ...match[action.team],
-        fouls: Math.max(0, Math.min(5, match[action.team].fouls + action.delta))
-      }
-    };
-  } else if (action.type === actionTypes.resetScore) {
-    nextMatch = {
-      ...match,
-      home: { ...match.home, score: 0 },
-      away: { ...match.away, score: 0 }
-    };
-  } else if (action.type === actionTypes.resetFouls) {
-    nextMatch = {
-      ...match,
-      home: { ...match.home, fouls: 0 },
-      away: { ...match.away, fouls: 0 }
-    };
-  } else if (action.type === actionTypes.updateTeams) {
-    const homeName = action.homeName?.trim();
-    const awayName = action.awayName?.trim();
-    const validLogo = (logo) => logo === null || (
-      typeof logo === "string" &&
-      logo.length <= 700000 &&
-      /^data:image\/(png|jpeg|webp|gif);base64,[a-z0-9+/]+=*$/i.test(logo)
-    );
-    if (
-      !homeName ||
-      !awayName ||
-      homeName.length > 40 ||
-      awayName.length > 40 ||
-      !validLogo(action.homeLogo ?? null) ||
-      !validLogo(action.awayLogo ?? null)
-    ) return;
-    nextMatch = {
-      ...match,
-      home: { ...match.home, name: homeName, logo: action.homeLogo ?? null },
-      away: { ...match.away, name: awayName, logo: action.awayLogo ?? null }
-    };
-  } else if (action.type === actionTypes.updateRoster) {
-    if (action.team !== "home" && action.team !== "away") return;
-    if (
-      !Array.isArray(action.players) ||
-      action.players.length > 30 ||
-      action.players.some((player) => typeof player !== "string" || !player.trim() || player.trim().length > 40)
-    ) return;
-    const players = [...new Set(action.players.map((player) => player.trim()))];
-    nextMatch = {
-      ...match,
-      [action.team]: { ...match[action.team], players }
-    };
-  } else if (action.type === actionTypes.registerBasket) {
-    const team = action.team;
-    const points = action.points;
-    const player = typeof action.player === "string" ? action.player.trim() : "";
-    if (
-      (team !== "home" && team !== "away") ||
-      ![1, 2, 3].includes(points) ||
-      !player ||
-      !match[team].players?.includes(player)
-    ) return;
-    nextMatch = {
-      ...match,
-      [team]: { ...match[team], score: match[team].score + points },
-      basketAnnouncement: { team, player, points }
-    };
+  const nextMatch = applyMatchAction(match, action);
+  if (!nextMatch) return;
+  if (action.type === actionTypes.registerBasket) {
     if (announcementTimers.has(matchId)) clearTimeout(announcementTimers.get(matchId));
     const timer = setTimeout(() => {
       const currentMatch = getMatch(matchId);
@@ -180,37 +94,6 @@ function handleAction(matchId, action, canEdit) {
       announcementTimers.delete(matchId);
     }, 5000);
     announcementTimers.set(matchId, timer);
-  } else if (action.type === actionTypes.updateOverlay) {
-    const header = action.header?.trim();
-    const footer = action.footer?.trim();
-    if (!header || !footer || header.length > 80 || footer.length > 80) return;
-    nextMatch = {
-      ...match,
-      overlay: { header, footer }
-    };
-  } else if (action.type === actionTypes.startClock) {
-    nextMatch = { ...match, clockRunning: true };
-  } else if (action.type === actionTypes.stopClock) {
-    nextMatch = { ...match, clockRunning: false };
-  } else if (action.type === actionTypes.resetClock) {
-    nextMatch = {
-      ...match,
-      clockSeconds: getPeriodDuration(match.period),
-      clockRunning: false
-    };
-  } else if (action.type === actionTypes.nextPeriod) {
-    const period = match.period + 1;
-    nextMatch = {
-      ...match,
-      period,
-      periodLabel: getPeriodLabel(period),
-      clockSeconds: getPeriodDuration(period),
-      clockRunning: false,
-      home: { ...match.home, fouls: 0 },
-      away: { ...match.away, fouls: 0 }
-    };
-  } else {
-    return;
   }
 
   publishMatch(matchId, nextMatch);
