@@ -101,13 +101,42 @@ test("normalizes rosters and only allows registered players to score", () => {
 
   assert.deepEqual(roster.home.players, ["Ana", "Luis"]);
   assert.equal(scored.home.score, 3);
-  assert.deepEqual(scored.basketAnnouncement, { team: "home", player: "Ana", points: 3 });
+  assert.deepEqual(scored.basketAnnouncement, { type: "basket", team: "home", player: "Ana", points: 3 });
   assert.equal(applyMatchAction(roster, {
     type: actionTypes.registerBasket,
     team: "home",
     points: 2,
     player: "Invitado"
   }), null);
+});
+
+test("registers personal fouls per player and increments team fouls", () => {
+  let match = matchWithRoster();
+
+  match = applyMatchAction(match, {
+    type: actionTypes.registerPersonalFoul,
+    team: "home",
+    player: "Ana"
+  });
+  match = applyMatchAction(match, {
+    type: actionTypes.registerPersonalFoul,
+    team: "home",
+    player: "Ana"
+  });
+  match = applyMatchAction(match, {
+    type: actionTypes.registerPersonalFoul,
+    team: "home",
+    player: "Ana"
+  });
+
+  assert.equal(match.home.personalFouls.Ana, 3);
+  assert.equal(match.home.fouls, 3);
+  assert.deepEqual(match.basketAnnouncement, {
+    type: "personalFoul",
+    team: "home",
+    player: "Ana",
+    foulNumber: 3
+  });
 });
 
 test("updates overlay text and resets fouls on the next period", () => {

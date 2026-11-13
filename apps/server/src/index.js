@@ -84,7 +84,10 @@ function handleAction(matchId, action, canEdit) {
   const match = getMatch(matchId);
   const nextMatch = applyMatchAction(match, action);
   if (!nextMatch) return;
-  if (action.type === actionTypes.registerBasket) {
+  if (
+    action.type === actionTypes.registerBasket ||
+    action.type === actionTypes.registerPersonalFoul
+  ) {
     if (announcementTimers.has(matchId)) clearTimeout(announcementTimers.get(matchId));
     const timer = setTimeout(() => {
       const currentMatch = getMatch(matchId);
