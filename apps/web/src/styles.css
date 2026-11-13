@@ -370,11 +370,27 @@ input[type="file"] {
 
 .basket-entry-button {
   display: block;
-  margin: 20px auto 0;
+  margin: 20px 0 0;
   font-size: 1rem;
 }
 
+.entry-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.foul-entry-button {
+  margin-top: 20px;
+  background: #be123c;
+}
+
+.foul-entry-button:hover {
+  background: #9f1239;
+}
+
 .basket-entry {
+  flex: 1 1 100%;
   margin-top: 20px;
 }
 
@@ -622,6 +638,24 @@ input[type="file"] {
   border-color: #fda4af;
 }
 
+.overlay-logo-stack {
+  position: relative;
+  display: flex;
+  flex: 0 0 38px;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.overlay-bonus {
+  margin-top: 5px;
+  margin-left: -4px;
+  color: #facc15;
+  font-size: 0.48rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  line-height: 1;
+}
+
 .overlay-team strong {
   min-width: 0;
   overflow: hidden;
@@ -772,6 +806,17 @@ input[type="file"] {
     margin-top: 18px;
   }
 
+  .entry-buttons {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .basket-entry-button,
+  .foul-entry-button {
+    width: 100%;
+    margin-top: 10px;
+  }
+
   .basket-player-form {
     grid-template-columns: 1fr;
   }
@@ -795,6 +840,15 @@ input[type="file"] {
     height: 28px;
     flex-basis: 28px;
     font-size: 0.5rem;
+  }
+
+  .overlay-logo-stack {
+    flex-basis: 28px;
+  }
+
+  .overlay-bonus {
+    margin-left: -3px;
+    font-size: 0.4rem;
   }
 
   .overlay-team strong {

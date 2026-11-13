@@ -2,8 +2,8 @@ export const initialMatchState = {
   matchId: "demo",
   sport: "basketball",
   status: "live",
-  home: { name: "Local", score: 0, fouls: 0, logo: null, players: [] },
-  away: { name: "Visitante", score: 0, fouls: 0, logo: null, players: [] },
+  home: { name: "Local", score: 0, fouls: 0, logo: null, players: [], personalFouls: {} },
+  away: { name: "Visitante", score: 0, fouls: 0, logo: null, players: [], personalFouls: {} },
   basketAnnouncement: null,
   overlay: { header: "BALONCESTO · PARTIDO EN DIRECTO", footer: "PABELLÓN · JORNADA" },
   period: 1,
@@ -21,6 +21,7 @@ export const actionTypes = {
   updateTeams: "UPDATE_TEAMS",
   updateRoster: "UPDATE_ROSTER",
   registerBasket: "REGISTER_BASKET",
+  registerPersonalFoul: "REGISTER_PERSONAL_FOUL",
   updateOverlay: "UPDATE_OVERLAY",
   startClock: "START_CLOCK",
   stopClock: "STOP_CLOCK",
@@ -119,7 +120,11 @@ export function applyMatchAction(match, action) {
       action.players.some((player) => typeof player !== "string" || !player.trim() || player.trim().length > 40)
     ) return null;
     const players = [...new Set(action.players.map((player) => player.trim()))];
-    return { ...match, [action.team]: { ...match[action.team], players } };
+    const personalFouls = Object.fromEntries(players.map((player) => [
+      player,
+      match[action.team].personalFouls?.[player] ?? 0
+    ]));
+    return { ...match, [action.team]: { ...match[action.team], players, personalFouls } };
   }
 
   if (action.type === actionTypes.registerBasket) {
@@ -133,7 +138,28 @@ export function applyMatchAction(match, action) {
     return {
       ...match,
       [action.team]: { ...match[action.team], score: match[action.team].score + action.points },
-      basketAnnouncement: { team: action.team, player, points: action.points }
+      basketAnnouncement: { type: "basket", team: action.team, player, points: action.points }
+    };
+  }
+
+  if (action.type === actionTypes.registerPersonalFoul) {
+    const player = typeof action.player === "string" ? action.player.trim() : "";
+    if (
+      (action.team !== "home" && action.team !== "away") ||
+      !player ||
+      !match[action.team].players?.includes(player)
+    ) return null;
+    const personalFouls = { ...(match[action.team].personalFouls ?? {}) };
+    const foulNumber = (personalFouls[player] ?? 0) + 1;
+    personalFouls[player] = foulNumber;
+    return {
+      ...match,
+      [action.team]: {
+        ...match[action.team],
+        fouls: Math.min(5, match[action.team].fouls + 1),
+        personalFouls
+      },
+      basketAnnouncement: { type: "personalFoul", team: action.team, player, foulNumber }
     };
   }
 

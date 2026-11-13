@@ -87,16 +87,47 @@ function MatchScore({ match, compact = false }) {
   );
 }
 
-function BasketEntry({ match, sendAction, onClose }) {
-  const [team, setTeam] = useState("home");
-  const [points, setPoints] = useState(null);
-  const [player, setPlayer] = useState("");
-  const players = match[team].players ?? [];
+function personalFoulLabel(number) {
+  return `${number}ª FALTA PERSONAL`;
+}
 
-  function choosePoints(value) {
-    setPoints(value);
-    setPlayer("");
-  }
+function FoulEntry({ match, sendAction, onClose }) {
+    const [team, setTeam] = useState("home");
+    const [player, setPlayer] = useState("");
+    const players = match[team].players ?? [];
+
+    function submit(event) {
+      event.preventDefault();
+      if (!player) return;
+      sendAction(actionTypes.registerPersonalFoul, { team, player });
+      onClose();
+    }
+
+    return (
+      <section className="basket-entry control-card">
+        <div className="basket-entry-header"><div><h2>Registrar falta personal</h2><p>Selecciona el equipo y el jugador que ha cometido la falta.</p></div><button onClick={onClose}>Cerrar</button></div>
+        <div className="basket-team-tabs">
+          {["home", "away"].map((item) => <button className={team === item ? "primary" : ""} key={item} onClick={() => { setTeam(item); setPlayer(""); }}>{match[item].name}</button>)}
+        </div>
+        <form className="basket-player-form foul-entry-form" onSubmit={submit}>
+          <label>Jugador<select value={player} onChange={(event) => setPlayer(event.target.value)} required><option value="">Selecciona un jugador</option>{players.map((name) => <option key={name} value={name}>{name} · {match[team].personalFouls?.[name] ?? 0} faltas</option>)}</select></label>
+          {players.length === 0 && <p className="form-error">Añade jugadores en la plantilla antes de registrar una falta.</p>}
+          <button className="primary" type="submit" disabled={!player}>Confirmar falta</button>
+        </form>
+      </section>
+    );
+}
+
+function BasketEntry({ match, sendAction, onClose }) {
+    const [team, setTeam] = useState("home");
+    const [points, setPoints] = useState(null);
+    const [player, setPlayer] = useState("");
+    const players = match[team].players ?? [];
+
+    function choosePoints(value) {
+      setPoints(value);
+      setPlayer("");
+    }
 
   function submit(event) {
     event.preventDefault();
@@ -146,6 +177,7 @@ function BasketballClock({ match, sendAction }) {
 
 function ControlPage({ match, connected, sendAction, onLogout }) {
   const [showBasketEntry, setShowBasketEntry] = useState(false);
+  const [showFoulEntry, setShowFoulEntry] = useState(false);
   const [homeName, setHomeName] = useState(match.home.name);
   const [awayName, setAwayName] = useState(match.away.name);
   const [homeLogo, setHomeLogo] = useState(match.home.logo ?? null);
@@ -201,7 +233,10 @@ function ControlPage({ match, connected, sendAction, onLogout }) {
       </header>
       <div className="period-banner"><span>{match.periodLabel}</span><span>{match.clockRunning ? "EN JUEGO" : "RELOJ PARADO"}</span></div>
       <MatchScore match={match} />
-      {showBasketEntry ? <BasketEntry match={match} sendAction={sendAction} onClose={() => setShowBasketEntry(false)} /> : <button className="basket-entry-button primary" onClick={() => setShowBasketEntry(true)}>Registrar canasta</button>}
+      <div className="entry-buttons">
+        {showBasketEntry ? <BasketEntry match={match} sendAction={sendAction} onClose={() => setShowBasketEntry(false)} /> : <button className="basket-entry-button primary" onClick={() => setShowBasketEntry(true)}>Registrar canasta</button>}
+        {showFoulEntry ? <FoulEntry match={match} sendAction={sendAction} onClose={() => setShowFoulEntry(false)} /> : <button className="basket-entry-button foul-entry-button" onClick={() => setShowFoulEntry(true)}>Registrar falta personal</button>}
+      </div>
       <BasketballClock match={match} sendAction={sendAction} />
       <section className="control-card">
         <div><h2>Puntos</h2><p>Elige la acción correspondiente. La resta nunca baja de cero.</p></div>
@@ -268,11 +303,11 @@ function OverlayPage({ match }) {
   return (
     <main className="overlay-page">
       <div className="overlay-score">
-        {match.basketAnnouncement && <div className="basket-announcement"><strong>{match.basketAnnouncement.player}</strong><span>{match.basketAnnouncement.points === 3 ? "TRIPLE" : `${match.basketAnnouncement.points} PUNTOS`}</span></div>}
+        {match.basketAnnouncement && <div className="basket-announcement"><strong>{match.basketAnnouncement.player}</strong><span>{match.basketAnnouncement.type === "personalFoul" ? personalFoulLabel(match.basketAnnouncement.foulNumber) : match.basketAnnouncement.points === 3 ? "TRIPLE" : `${match.basketAnnouncement.points} PUNTOS`}</span></div>}
         <div className="overlay-header">{match.overlay?.header ?? "BALONCESTO · PARTIDO EN DIRECTO"}</div>
         <div className="overlay-main">
-          <div className="overlay-team"><TeamLogo team={match.home} className="overlay-logo home" /><strong>{match.home.name}</strong><b>{match.home.score}</b><small>F {match.home.fouls}</small></div>
-          <div className="overlay-team away"><TeamLogo team={match.away} className="overlay-logo away" /><strong>{match.away.name}</strong><b>{match.away.score}</b><small>F {match.away.fouls}</small></div>
+          <div className="overlay-team"><div className="overlay-logo-stack"><TeamLogo team={match.home} className="overlay-logo home" />{match.home.fouls >= 5 && <span className="overlay-bonus">BONUS</span>}</div><strong>{match.home.name}</strong><b>{match.home.score}</b><small>F {match.home.fouls}</small></div>
+          <div className="overlay-team away"><div className="overlay-logo-stack"><TeamLogo team={match.away} className="overlay-logo away" />{match.away.fouls >= 5 && <span className="overlay-bonus">BONUS</span>}</div><strong>{match.away.name}</strong><b>{match.away.score}</b><small>F {match.away.fouls}</small></div>
           <div className="overlay-period"><span>{formatPeriod(match.period)}</span></div>
           <div className="overlay-time">{formatClock(match.clockSeconds)}</div>
         </div>
