@@ -55,8 +55,17 @@ app.post("/matches", (request, response) => {
     response.status(401).json({ message: "Necesitas iniciar sesión." });
     return;
   }
+  const { sport = "basketball", scoringMode } = request.body ?? {};
+  if (!["basketball", "tennis-padel"].includes(sport)) {
+    response.status(400).json({ message: "Este deporte todavía no está disponible." });
+    return;
+  }
+  if (sport === "tennis-padel" && !["golden", "advantage", "star"].includes(scoringMode)) {
+    response.status(400).json({ message: "Selecciona una modalidad de puntuación válida." });
+    return;
+  }
   const matchId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-  const match = createMatchState(matchId);
+  const match = createMatchState(matchId, sport, { scoringMode });
   matches.set(matchId, match);
   response.status(201).json(match);
 });
